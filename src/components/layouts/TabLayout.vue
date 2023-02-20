@@ -20,9 +20,9 @@
     </a-tabs>
     <div style="margin: 12px 12px 0;">
       <!-- update-begin-author:taoyan date:20201221 for:此处删掉transition标签 不知道为什么加上后 页面路由切换的时候即1及菜单切到2及菜单的时候 两个菜单页面会同时出现300-500秒左右 -->
-      <keep-alive v-if="multipage">
-        <router-view v-if="reloadFlag"/>
-      </keep-alive>
+      <router-view-cache v-if="multipage" ref="routeViewCache">
+        <router-view/>
+      </router-view-cache>
       <template v-else>
         <router-view v-if="reloadFlag"/>
       </template>
@@ -42,6 +42,7 @@
   import Vue from 'vue'
   import { CACHE_INCLUDED_ROUTES } from '@/store/mutation-types'
   import registerApps from "@/qiankun";
+  import RouterViewCache from '../RouterViewCache'
 
   const indexKey = '/dashboard/analysis'
 
@@ -49,7 +50,8 @@
     name: 'TabLayout',
     components: {
       GlobalLayout,
-      Contextmenu
+      Contextmenu,
+      RouterViewCache
     },
     mixins: [mixin, mixinDevice],
     data() {
@@ -109,7 +111,7 @@
     },
     watch: {
       '$route': function(newRoute) {
-        //console.log("新的路由",newRoute)
+        // console.log("新的路由",newRoute,this.$router.getMatchedComponents(newRoute))
         this.activePage = newRoute.fullPath
         if (!this.multipage) {
           this.linkList = [newRoute.fullPath]
@@ -117,13 +119,16 @@
         // update-begin-author:taoyan date:20200211 for: TASK #3368 【路由缓存】首页的缓存设置有问题，需要根据后台的路由配置来实现是否缓存
         } else if(indexKey==newRoute.fullPath) {
           //首页时 判断是否缓存 没有缓存 刷新之
-          if (newRoute.meta.keepAlive === false) {
-            this.routeReload()
-          }
+          // 会导致其他页面缓存失效，暂时注释掉下面三行代码
+          // if (newRoute.meta.keepAlive === false) {
+          //   this.routeReload()
+          // }
         // update-end-author:taoyan date:20200211 for: TASK #3368 【路由缓存】首页的缓存设置有问题，需要根据后台的路由配置来实现是否缓存
         }else if (this.linkList.indexOf(newRoute.fullPath) < 0) {
-          this.linkList.push(newRoute.fullPath)
-          this.pageList.push(Object.assign({},newRoute))
+          let currentRoute = Object.assign({}, newRoute)
+          currentRoute.meta = Object.assign({}, currentRoute.meta)
+          this.pageList.push(currentRoute)
+          this.linkList.push(currentRoute.fullPath)
           //// update-begin-author:sunjianlei date:20200103 for: 如果新增的页面配置了缓存路由，那么就强制刷新一遍 #842
           // if (newRoute.meta.keepAlive) {
           //   this.routeReload()
@@ -251,6 +256,7 @@
             Vue.ls.set(CACHE_INCLUDED_ROUTES, cacheRouterArray)
           }
           this.emitPageClosed(removeRoute[0])
+          this.$refs.routeViewCache.removeCacheByKey(key)
         }
         //update-end--Author:scott  Date:20201015 for：路由缓存问题，关闭了tab页时再打开就不刷新 #842
 
